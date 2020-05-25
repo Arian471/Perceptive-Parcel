@@ -84,5 +84,21 @@ void loop() {
     client.print("\r\n");
     client.println();
     serializeJson(doc, client);
+  
+    int n = WiFi.scanNetworks();
+    Serial.println("scan done");
+    if (n == 0) {
+      doc["network"] = "";
+    } else {
+      doc["network"] = "";
+      DynamicJsonDocument networks(1024);
+      for (int i = 0; i < n; ++i) {
+        // Print SSID and RSSI for each network found
+        networks[i]["SSID"] = WiFi.SSID(i);
+        networks[i]["RSSI"] = WiFi.RSSI(i);
+      }
+      doc["network"] = networks;
+    }
+    serializeJson(doc, Serial);
   }
 }
