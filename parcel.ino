@@ -7,7 +7,6 @@
 #include "SSD1306.h" 
 #include <WifiLocation.h>
 
-const char* googleApiKey = "AIzaSyD598bfaL-Cy6gRQGwXCzBAOn3EUBRQKZM";
 
 const char* ssid = "Send Nudes";
 const char* password = "totallysecurepassword3000";
@@ -16,43 +15,44 @@ const char* host = "b7e1ae648528.ngrok.io";
 const char* resource = "/sensors";
 const char* getAdr = "/sensors/test";
 
+WiFiClient client;
+
+const char* googleApiKey = "AIzaSyD598bfaL-Cy6gRQGwXCzBAOn3EUBRQKZM";
 WifiLocation location(googleApiKey);
 
-float flippedDegree = 140;
-float maxAcc = 2;
+SSD1306  display(0x3c, 25, 26);
 
 String configurationData;
 float configurationDataArr[2];
 
 int timerDelayPost = 5000;
-
-
-String alertAcc = "";
-String alertFlip = "";
-
-SSD1306  display(0x3c, 25, 26);
-
-WiFiClient client;
+long lastTime = 0;
 
 MPU6050 mpu6050(Wire);
-
-long lastTimePost = 0;
-long lastTimeGet = 0;
-
+float maxAcc = 2;
+float flippedDegree = 110;
+String alertAcc = "";
+String alertFlip = "";
 float lastAcceleration;
-
 float maxFound = 0;
-
 float tempMaxAcc = 0;
+
+
+bool ledBlinking = false;
+bool ledState = false;
+int lastChangedLed = 0;
+bool begun = false;
+
+String reply = "";
 
 void setup() {
   Serial.begin(115200);
   display.init();
-  Wire.begin(25, 26);
+  Wire.begin(25, 26);//The I2C connection on which the MPU6050 is conected
   mpu6050.begin();
-  mpu6050.calcGyroOffsets(true);
+  mpu6050.calcGyroOffsets(true); //calibrates the gyroscope to minimize drift
 
-  pinMode(32, OUTPUT);
+  pinMode(32, OUTPUT);//this is the led pin
    
   WiFi.begin(ssid, password);
   Serial.println("Connecting");
@@ -61,64 +61,47 @@ void setup() {
     Serial.print(".");
   }
   Serial.println("");
-  Serial.print("Connected to WiFi network with IP Address: ");
-  Serial.println(WiFi.localIP());
+  Serial.print("Connected to WiFi network");
 }
 
 bool connect(const char* hostName, int portNumber) {
-  Serial.print("Connect to ");
-  Serial.println(hostName);
-
-  bool ok = client.connect(hostName, portNumber);
-
+  bool ok = client.connect(hostName, portNumber);//connects to the server
   Serial.println(ok ? "Connected" : "Connection Failed!");
   return ok;
-
-  lastAcceleration = mpu6050.getAccX()+ mpu6050.getAccY()+ mpu6050.getAccZ();
 }
 
 void trackAcceleration(){
   lastAcceleration = abs(mpu6050.getAccX()) + abs(mpu6050.getAccY()) + abs(mpu6050.getAccZ());
+  //the sum of the absolute acceleration in all 3 axis
   
   if(maxFound < lastAcceleration) {
     maxFound = lastAcceleration;
   }
-  if(tempMaxAcc < lastAcceleration) {
+  if(tempMaxAcc < lastAcceleration) {//stores the largest acceleration since the data was last shared with the server
     tempMaxAcc = lastAcceleration;
   }
-}
-
-void printGyro(){
-  Serial.print(mpu6050.getAngleX());
-  Serial.print(mpu6050.getAngleY());
-  Serial.println(mpu6050.getAngleZ());
 }
 
 void checkRestrictions(){
   if(maxFound > maxAcc){
     alertAcc = "MAY BE DAMAGED \n";
   }
-  if(abs(mpu6050.getAccAngleX()) > 160 && abs(mpu6050.getAccAngleY()) > 160){
+  if(abs(mpu6050.getAccAngleX()) > flippedDegree && abs(mpu6050.getAccAngleY()) > flippedDegree){
     alertFlip = "MAY HAVE BEEN FLIPPED \n";
   }
 }
 
-bool ledBlinking = false;
-bool ledState = false;
-int lastChangedLed = 0;
-bool begun = false;
-String reply = "";
 void loop() {
   display.clear();
   mpu6050.update();
   trackAcceleration();
-  //printGyro();
   checkRestrictions();
   display.drawString(0, 0, String("Acc: ") + maxFound + String(" / ") + maxAcc +
   String("\n") + alertAcc + mpu6050.getTemp() + String("C* \n") + alertFlip);
   
   display.display();
-  delay(200);
+  
+  //converts the slowly incomming message from the sercer to a string
   reply = "";
   while (client.available()) {
     char c = client.read();
@@ -136,6 +119,7 @@ void loop() {
     }
 
   }
+  //convert that string to a JSON object with all the data that is needed
   if(reply != ""){
     
     DynamicJsonDocument temp(200);
@@ -147,6 +131,8 @@ void loop() {
     timerDelayPost = obj["test3"];
     ledBlinking = obj["test4"];
   }
+  
+  
   if (ledBlinking) {
     if ((millis() - lastChangedLed) > 400) {
       if(ledState){
@@ -159,25 +145,21 @@ void loop() {
   } else {
     digitalWrite(32,LOW);// turn the LED off by making the voltage LOW
   }
+  
 
-  if ((millis() - lastTimePost) > timerDelayPost) {
+  if ((millis() - lastTime) > timerDelayPost) {
     if(connect(host, 80)) {
       DynamicJsonDocument doc(1024);
       doc["Temperature"] = mpu6050.getTemp();
       doc["Acceleration"] = tempMaxAcc;
       doc["Flipped"] = (abs(mpu6050.getAccAngleX()) > 160 && abs(mpu6050.getAccAngleY()) > 160);
 
-
-
-
-
-      location_t loc = location.getGeoFromWiFi();
-      
+      location_t loc = location.getGeoFromWiFi();//get the location using the WiFi networks nearby and Google's Geolocation API
       doc["Lat"] = String(loc.lat, 7);
       doc["Long"] = String(loc.lon, 7);
       doc["Accuracy"] = String(loc.accuracy);
 
-      //The rest of this data is not used, but is sent for future features
+      //The rest of this data is not used, but is sent in case it is needed in the future
       doc["GyroX"] = mpu6050.getGyroX();
       doc["GyroY"] = mpu6050.getGyroY();
       doc["GyroZ"] = mpu6050.getGyroZ();
@@ -193,7 +175,6 @@ void loop() {
       tempMaxAcc = 0;
 
       int n = WiFi.scanNetworks();
-      Serial.println("scan done");
       if (n == 0) {
         doc["network"] = "";
       } else {
@@ -206,6 +187,8 @@ void loop() {
         }
         doc["network"] = networks;
       }
+      
+      //send a post request with all the data we want to share from the parcel
       client.print("POST ");
       client.print(resource);
       client.println(" HTTP/1.1");
@@ -224,25 +207,23 @@ void loop() {
       httpGetRequest();
       
     }
-    lastTimePost = millis();
+    lastTime = millis();
   }
 }
 
 
 void httpGetRequest() {
-  // close any connection before send a new request.
-  // This will free the socket on the WiFi shield
+  //make sure there are no other connections
   client.stop();
 
   // if there's a successful connection:
   if (client.connect(host, 80)) {
-    Serial.println("connecting...");
-    // send the HTTP PUT request:
+    //send the GET request
     client.println((String)"GET " + getAdr + " HTTP/1.1");
     client.println((String)"Host: " + host);
     client.println("Connection: close");
     client.println();
   } else {
-    Serial.println("connection failed");
+    Serial.println("connection failed for GET request");
   }
 }
