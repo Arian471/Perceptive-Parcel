@@ -8,8 +8,8 @@
 #include <WifiLocation.h>
 
 
-const char* ssid = "Send Nudes";
-const char* password = "totallysecurepassword3000";
+const char* ssid = "SSID";
+const char* password = "PASSWORD";
 
 const char* host = "b7e1ae648528.ngrok.io";
 const char* resource = "/sensors";
