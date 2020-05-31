@@ -17,7 +17,7 @@ const char* getAdr = "/sensors/test";
 
 WiFiClient client;
 
-const char* googleApiKey = "AIzaSyD598bfaL-Cy6gRQGwXCzBAOn3EUBRQKZM";
+const char* googleApiKey = "KEY";
 WifiLocation location(googleApiKey);
 
 SSD1306  display(0x3c, 25, 26);
