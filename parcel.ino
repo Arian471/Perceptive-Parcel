@@ -11,7 +11,7 @@
 const char* ssid = "SSID";
 const char* password = "PASSWORD";
 
-const char* host = "b7e1ae648528.ngrok.io";
+const char* host = "Server URL";
 const char* resource = "/sensors";
 const char* getAdr = "/sensors/test";
 
