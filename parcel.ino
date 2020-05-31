@@ -152,7 +152,7 @@ void loop() {
       DynamicJsonDocument doc(1024);
       doc["Temperature"] = mpu6050.getTemp();
       doc["Acceleration"] = tempMaxAcc;
-      doc["Flipped"] = (abs(mpu6050.getAccAngleX()) > 160 && abs(mpu6050.getAccAngleY()) > 160);
+      doc["Flipped"] = (abs(mpu6050.getAccAngleX()) > flippedDegree && abs(mpu6050.getAccAngleY()) > flippedDegree);
 
       location_t loc = location.getGeoFromWiFi();//get the location using the WiFi networks nearby and Google's Geolocation API
       doc["Lat"] = String(loc.lat, 7);
